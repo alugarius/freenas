@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-import os
+from __future__ import print_function
 import sys
 
 import getopt
@@ -11,12 +11,14 @@ import freenasOS.Package as Package
 import freenasOS.Configuration as Configuration
 import freenasOS.Installer as Installer
 
+
 def PrintProgress(pct, name):
-    print >> sys.stderr, "Got %s (%.2f%%)" % (name, pct)
+    print("Got %s (%.2f%%)" % (name, pct), file=sys.stderr)
+
 
 def usage():
-    print >> sys.stderr, "Usage: %s -M manifest [-P package_dir] root" % sys.argv[0]
-    print >> sys.stderr, "\tNote:  package dir is parent of Packages directory"
+    print("Usage: %s -M manifest [-P package_dir] root" % sys.argv[0], file=sys.stderr)
+    print("\tNote:  package dir is parent of Packages directory", file=sys.stderr)
     sys.exit(1)
 
 if __name__ == "__main__":
@@ -29,9 +31,12 @@ if __name__ == "__main__":
         usage()
 
     for (o, a) in opts:
-        if o == "-M": mani_file = a
-        elif o == "-P": package_dir = a
-        else: usage()
+        if o == "-M":
+            mani_file = a
+        elif o == "-P":
+            package_dir = a
+        else:
+            usage()
 
     if len(args) != 1:
         usage()
@@ -48,13 +53,13 @@ if __name__ == "__main__":
         # We ignore the signature because freenas-install is
         # called from the ISO install, and the GUI install, which
         # have their own checksums elsewhere.
-        manifest = Manifest.Manifest(config, require_signature = False)
+        manifest = Manifest.Manifest(config, require_signature=False)
         manifest.LoadPath(mani_file)
 
-    installer = Installer.Installer(manifest = manifest, root = root, config = config)
+    installer = Installer.Installer(manifest=manifest, root=root, config=config)
 
     if installer.GetPackages() != True:
-        print >> sys.stderr, "Huh, could not install and yet it returned"
+        print("Huh, could not install and yet it returned", file=sys.stderr)
 
     installer.InstallPackages(PrintProgress)
     manifest.Save(root)

@@ -1,21 +1,25 @@
 #!/usr/local/bin/python -R
 # Create a pkgng-like package from a directory.
 
-import os, sys, stat
+from __future__ import print_function
+import os
+import sys
 import json
 import tarfile
 import getopt
 import hashlib
+import fnmatch
 import StringIO
 import ConfigParser
 
 debug = 0
 verbose = False
-#
+
+
 # Scan a directory hierarchy, creating a
 # "files" and "directories" set of dictionaries.
 # Regular files get sha256 checksums.
-def ScanTree(root, filter_func = None):
+def ScanTree(root, filter_func=None):
     global debug, verbose
     flat_size = 0
     # This is a list of files we've seen, by <st_dev, st_ino> keys.
@@ -41,24 +45,26 @@ def ScanTree(root, filter_func = None):
                 if filter_func(prefix+f) == True:
                     continue
             full_path = start + "/" + f
-            if verbose or debug > 0: print >> sys.stderr, "looking at %s" % full_path
+            if verbose or debug > 0:
+                print("looking at %s" % full_path, file=sys.stderr)
             st = os.lstat(full_path)
             size = None
             if os.path.islink(full_path):
                 buf = os.readlink(full_path)
                 size = len(buf)
-                if buf.startswith("/"): buf = buf[1:]
+                if buf.startswith("/"):
+                    buf = buf[1:]
                 file_list[prefix + f] = hashlib.sha256(buf).hexdigest()
             elif os.path.isfile(full_path):
                 size = st.st_size
-                with open(full_path) as file:
+                with open(full_path, 'rb') as file:
                     file_list[prefix + f] = hashlib.sha256(file.read()).hexdigest()
 
             if size is not None and (st.st_dev, st.st_ino) not in seen_files:
                 flat_size += size
                 seen_files[st.st_dev, st.st_ino] = True
 
-    return { "files" : file_list, "directories" : directory_list, "flatsize" : flat_size }
+    return {"files": file_list, "directories": directory_list, "flatsize": flat_size}
 
 
 #
@@ -67,20 +73,22 @@ def ScanTree(root, filter_func = None):
 # We'll assume some defaults specific to ix.
 
 def usage():
-    print >> sys.stderr, "Usage: %s [-dv] -R <root> -T template -N <name> -V <version> output_file" % sys.argv[0]
+    print("Usage: %s [-dv] -R <root> -T template -N <name> -V <version> output_file" % sys.argv[0], file=sys.stderr)
     sys.exit(1)
 
 SCRIPTS = [
-	"pre-install",
-	"post-install",
-	"install",
-	"pre-deinstall",
-	"post-deinstall",
-	"deinstall",
-	"pre-upgrade",
-	"post-upgrade",
-	"upgrade"
+    "pre-install",
+    "post-install",
+    "install",
+    "pre-deinstall",
+    "post-deinstall",
+    "deinstall",
+    "pre-upgrade",
+    "post-upgrade",
+    "upgrade"
 ]
+
+
 def TemplateFiles(path):
     """
     Load a ConfigParser file as a configuration file.
@@ -121,6 +129,7 @@ def TemplateFiles(path):
     rv["exclude"] = excludes
     return rv
 
+
 def LoadTemplate(path):
     """
     Load a ConfigParser file as a template.
@@ -139,45 +148,46 @@ def LoadTemplate(path):
     """
     rv = {}
     if os.path.exists(path) == False:
-	raise Exception("%s does not exist" % path)
+        raise Exception("%s does not exist" % path)
     if os.path.isdir(path):
-	base_dir = path
-	cfg_file = path + "/config"
+        base_dir = path
+        cfg_file = path + "/config"
     else:
-	base_dir = os.path.dirname(path)
-	cfg_file = path
+        base_dir = os.path.dirname(path)
+        cfg_file = path
 
     cfp = ConfigParser.ConfigParser()
     try:
-	cfp.read(cfg_file)
+        cfp.read(cfg_file)
     except:
-	return rv
+        return rv
 
     if cfp.has_section("Package"):
-	# Get the various manifest settings
-	for key in ["name", "www", "arch", "maintainer",
-		"comment", "origin", "prefix", "licenslogic",
-		"licenses", "desc"]:
-	    if cfp.has_option("Package", key):
-		rv[key] = cfp.get("Package", key)
+        # Get the various manifest settings
+        for key in [
+            "name", "www", "arch", "maintainer", "comment", "origin",
+            "prefix", "licenslogic", "licenses", "desc"
+        ]:
+            if cfp.has_option("Package", key):
+                rv[key] = cfp.get("Package", key)
         # Some optional boolean values
         for key in ["requires-reboot"]:
             if cfp.has_option("Package", key):
                 rv[key] = cfp.getboolean("Package", key)
-                
+
     if cfp.has_section("Scripts"):
-	if "scripts" not in rv:
-	    rv["scripts"] = {}
-	for opt, val in cfp.items("Scripts"):
-	    if val.startswith("file:"):
-		# Skip over the file: part
-		fname = val[5:]
-		if fname.startswith("/") == False:
-		    fname = base_dir + "/" + fname
-		with open(fname, "r") as f:
-		    rv["scripts"][opt] = f.read()
-	    else:
-		rv["scripts"][opt] = val
+        if "scripts" not in rv:
+            rv["scripts"] = {}
+        for opt, val in cfp.items("Scripts"):
+            if val.startswith("file:"):
+                # Skip over the file: part
+                fname = val[5:]
+                if fname.startswith("/") == False:
+                    fname = base_dir + "/" + fname
+                with open(fname, "r") as f:
+                    rv["scripts"][opt] = f.read()
+            else:
+                rv["scripts"][opt] = val
 
     # Look for a list of services (and ones to restart)
     if cfp.has_section("Services"):
@@ -197,30 +207,31 @@ def LoadTemplate(path):
                         restart_list[svc] = True
                 else:
                     for svc in cfp.get("Services", "restart").split(","):
-                        if not svc in service_list:
+                        if svc not in service_list:
                             print >> sys.stderr, "Restart service %s not in service list" % svc
                         else:
                             restart_list[svc] = True
-            sdict = { "Services" : service_list }
+            sdict = {"Services": service_list}
             if len(restart_list) > 0:
                 sdict["Restart"] = restart_list
             rv["ix-package-services"] = sdict
     return rv
 
+
 def main():
     global debug, verbose
     # Some valid, but stupid, defaults.
     manifest = {
-        "www" : "http://www.freenas.org",
-        "arch" : "freebsd:9:x86:64",
-        "maintainer" : "something@freenas.org",
-        "comment" : "FreeNAS Package",
-        "origin" : "freenas/os",
-        "prefix" : "/",
-        "licenselogic" : "single",
-        "desc" : "FreeNAS Package",
-        "requires-reboot" : True,
-        }
+        "www": "http://www.freenas.org",
+        "arch": "freebsd:10:x86:64",
+        "maintainer": "something@freenas.org",
+        "comment": "FreeNAS Package",
+        "origin": "freenas/os",
+        "prefix": "/",
+        "licenselogic": "single",
+        "desc": "FreeNAS Package",
+        "requires-reboot": True,
+    }
     root = None
     arg_name = None
     arg_version = None
@@ -231,7 +242,7 @@ def main():
         for o, a in opts:
             if o == "-N":
                 arg_name = a
-	    elif o == "-T":
+            elif o == "-T":
                 arg_template = a
             elif o == "-V":
                 arg_version = a
@@ -242,21 +253,21 @@ def main():
             elif o == "-v":
                 verbose = True
             else:
-                print >> sys.stderr, "Unknown options %s" % o
+                print("Unknown options %s" % o, file=sys.stderr)
                 usage()
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         usage()
     if len(args) > 1:
-        print >> sys.stderr, "Too many arguments"
+        print("Too many arguments", file=sys.stderr)
         usage()
     elif len(args) == 0:
-        print >> sys.stderr, "Output file must be specified"
+        print("Output file must be specified", file=sys.stderr)
         usage()
     else:
         output = args[0]
     if root is None:
-        print >> sys.stderr, "Root directory must be specified"
+        print("Root directory must be specified", file=sys.stderr)
         usage()
 
     include_list = None
@@ -264,17 +275,18 @@ def main():
     if arg_template is not None:
         tdict = LoadTemplate(arg_template)
         if tdict is not None:
-            for k in tdict.keys():
+            for k in list(tdict.keys()):
                 manifest[k] = tdict[k]
-        print >> sys.stderr, "manifest = %s" % manifest
+        print("manifest = %s" % manifest, file=sys.stderr)
         filters = TemplateFiles(arg_template)
         if filters is not None:
-            if debug > 1:  print >> sys.stderr, "Filter list = %s" % filters
+            if debug > 1:
+                print("Filter list = %s" % filters, file=sys.stderr)
             if len(filters["include"]) > 0:
                 include_list = filters["include"]
             if len(filters["exclude"]) > 0:
                 exclude_list = filters["exclude"]
-            
+
     def FilterFunc(path):
         """
         Return a boolean indicating whether the path in question
@@ -304,8 +316,6 @@ def main():
 
         # Yes, I know, a nested function in a nested function.
         def matches(path, pattern):
-            import fnmatch
-
             prefix = ""
             if path.startswith("./"):
                 prefix = "."
@@ -315,12 +325,14 @@ def main():
                 tmp = pattern
             # First, check to see if the name simply matches
             if path == tmp:
-                if debug: print >> sys.stderr, "Match: %s" % path
+                if debug:
+                    print("Match: %s" % path, file=sys.stderr)
                 return True
             # Next, check to see if elem is a subset of it
             if path.startswith(tmp) and \
                path[len(tmp)] == "/":
-                if debug: print >> sys.stderr, "Match %s as child of %s" % (path, tmp)
+                if debug:
+                    print("Match %s as child of %s" % (path, tmp), file=sys.stderr)
                 return True
             # Now to start using globbing.
             # fnmatch is awful, but let's try just that
@@ -328,7 +340,8 @@ def main():
             # Thus, "/usr/*.cfg" matches both "/usr/foo.cfg" and
             # "/usr/local/etc/django.cfg".)
             if fnmatch.fnmatch(path, elem):
-                if debug: print >> sys.stderr, "Match: %s as glob match for %s" % (path, tmp)
+                if debug:
+                    print("Match: %s as glob match for %s" % (path, tmp), file=sys.stderr)
                 return True
             return False
 
@@ -353,43 +366,48 @@ def main():
 
     # Now sanity test
     if "name" not in manifest:
-        print >> sys.stderr, "Package must have a name"
-        print >> sys.stderr, manifest
+        print("Package must have a name", file=sys.stderr)
+        print(manifest, file=sys.stderr)
         usage()
     if "version" not in manifest:
-        print >> sys.stderr, "Package must have a version"
+        print("Package must have a version", file=sys.stderr)
         usage()
 
-    if debug > 2: print >> sys.stderr, manifest
+    if debug > 2:
+        print(manifest, file=sys.stderr)
 
     # Now start scanning.
     t = ScanTree(root, FilterFunc)
     manifest["files"] = t["files"]
     manifest["directories"] = t["directories"]
     manifest["flatsize"] = t["flatsize"]
-    manifest_string = json.dumps(manifest, sort_keys=True,
-                                 indent=4, separators=(',', ': '))
-    if debug > 1: print manifest_string
+    manifest_string = json.dumps(manifest, sort_keys=True, indent=4, separators=(',', ': '))
+    if debug > 1:
+        print(manifest_string, file=sys.stderr)
 
     # I would LOVE to be able to use xz, but python's tarfile does not
     # (as of when I write this) support it.  Python 3 has it.
-    tf = tarfile.open(output, "w:gz", format = tarfile.PAX_FORMAT)
+    tf = tarfile.open(output, "w:gz", format=tarfile.PAX_FORMAT)
 
     # Add the manifest string as the file "+MANIFEST"
-    mani_file_info = tarfile.TarInfo(name = "+MANIFEST")
+    mani_file_info = tarfile.TarInfo(name="+MANIFEST")
     mani_file_info.size = len(manifest_string)
-    mani_file_info.mode = 0600
+    mani_file_info.mode = 0x600
     mani_file_info.type = tarfile.REGTYPE
     mani_file = StringIO.StringIO(manifest_string)
     tf.addfile(mani_file_info, mani_file)
     # Now add all of the files
     for file in sorted(manifest["files"]):
-        if verbose or debug > 0:  print >> sys.stderr, "Adding file %s to archive" % file
-        tf.add(root + file, arcname = file, recursive = False)
+        if verbose or debug > 0:
+            print("Adding file %s to archive" % file, file=sys.stderr)
+        tf.add(root + file, arcname=file, recursive=False)
     # And now the directories
     for dir in sorted(manifest["directories"]):
-        if verbose or debug > 0:  print >> sys.stderr, "Adding directory %s to archive" % dir
-        tf.add(root + dir, arcname = dir, recursive = False)
+        if verbose or debug > 0:
+            print("Adding directory %s to archive" % dir, file=sys.stderr)
+        tf.add(root + dir, arcname=dir, recursive=False)
+
+    tf.close()
 
     return 0
 
