@@ -23,9 +23,16 @@ from stat import (
 )
 
 VERIFY_SKIP_PATHS = [
-    '/var/', '/etc', '/dev', '/conf/base/etc/master.passwd', '/compat/linux/proc',
-    '/boot/zfs/zpool.cache', '/boot/device.hints', '/usr/share/man/whatis',
-    '/usr/local/share/smartmontools/drivedb.h', '/usr/local/lib/perl5/5.16/man/whatis',
+    '/var/',
+    '/etc',
+    '/dev',
+    '/conf/base/etc/master.passwd',
+    '/compat/linux/proc',
+    '/boot/zfs/zpool.cache',
+    '/boot/device.hints',
+    '/usr/share/man/whatis',
+    '/usr/local/share/smartmontools/drivedb.h',
+    '/usr/local/lib/perl5/5.16/man/whatis',
 ]
 
 CONFIG_DEFAULT = "Defaults"
@@ -48,7 +55,7 @@ log = logging.getLogger('freenasOS.Configuration')
 # searching any longer.
 # We may want to use a different update server for
 # TrueNAS.
-#UPDATE_SERVER = "http://beta-update.freenas.org/" + Avatar()
+# UPDATE_SERVER = "http://beta-update.freenas.org/" + Avatar()
 SEARCH_LOCATIONS = ["http://update.freenas.org/" + Avatar()]
 
 # List of trains
@@ -106,11 +113,9 @@ class CertValidatingHTTPSConnection(httplib.HTTPConnection):
 
     def _GetValidHostsForCert(self, cert):
         if 'subjectAltName' in cert:
-            return [x[1] for x in cert['subjectAltName']
-                         if x[0].lower() == 'dns']
+            return [x[1] for x in cert['subjectAltName'] if x[0].lower() == 'dns']
         else:
-            return [x[0][1] for x in cert['subject']
-                            if x[0][0].lower() == 'commonname']
+            return [x[0][1] for x in cert['subject'] if x[0][0].lower() == 'commonname']
 
     def _ValidateCertificateHostname(self, cert, hostname):
         import re
@@ -123,16 +128,18 @@ class CertValidatingHTTPSConnection(httplib.HTTPConnection):
 
     def connect(self):
         sock = socket.create_connection((self.host, self.port))
-        self.sock = ssl.wrap_socket(sock, keyfile=self.key_file,
-                                          certfile=self.cert_file,
-                                          cert_reqs=self.cert_reqs,
-                                          ca_certs=self.ca_certs)
+        self.sock = ssl.wrap_socket(
+            sock,
+            keyfile=self.key_file,
+            certfile=self.cert_file,
+            cert_reqs=self.cert_reqs,
+            ca_certs=self.ca_certs
+        )
         if self.cert_reqs & ssl.CERT_REQUIRED:
             cert = self.sock.getpeercert()
             hostname = self.host.split(':', 0)[0]
             if not self._ValidateCertificateHostname(cert, hostname):
-                raise InvalidCertificateException(hostname, cert,
-                                                  'hostname mismatch')
+                raise InvalidCertificateException(hostname, cert, 'hostname mismatch')
 
 
 class VerifiedHTTPSHandler(urllib2.HTTPSHandler):
@@ -150,22 +157,21 @@ class VerifiedHTTPSHandler(urllib2.HTTPSHandler):
             return self.do_open(http_class_wrapper, req)
         except urllib2.URLError, e:
             if type(e.reason) == ssl.SSLError and e.reason.args[0] == 1:
-                raise InvalidCertificateException(req.host, '',
-                                                  e.reason.args[1])
+                raise InvalidCertificateException(req.host, '', e.reason.args[1])
             raise
 
     https_request = urllib2.HTTPSHandler.do_request_
 
 
 class PackageDB:
-#    DB_NAME = "var/db/ix/freenas-db"
+    # DB_NAME = "var/db/ix/freenas-db"
     DB_NAME = "data/pkgdb/freenas-db"
     __db_path = None
     __db_root = ""
     __conn = None
     __close = True
 
-    def __init__(self, root = "", create = True):
+    def __init__(self, root="", create=True):
         if root is None:
             root = ""
         self.__db_root = root
@@ -176,26 +182,26 @@ class PackageDB:
             log.debug("Need to create %s", os.path.dirname(self.__db_path))
             os.makedirs(os.path.dirname(self.__db_path))
 
-        if self._connectdb(returniferror = True, cursor = False) is None:
-            raise Exception("Cannot connect to database file %s" % self.__db_path)
+        if self._connectdb(returniferror=True, cursor=False) is None:
+            raise Exception("Cannot connect to database file {0}".format(self.__db_path))
 
         cur = self.__conn.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS packages(name text primary key, version text not null)")
         cur.execute("CREATE TABLE IF NOT EXISTS scripts(package text not null, type text not null, script text not null)")
         cur.execute("""CREATE TABLE IF NOT EXISTS
-		files(package text not null,
-			path text primary key,
-			kind text not null,
-			checksum text,
-			uid integer,
-			gid integer,
-			flags integer,
-			mode integer)""")
+        files(package text not null,
+            path text primary key,
+            kind text not null,
+            checksum text,
+            uid integer,
+            gid integer,
+            flags integer,
+            mode integer)""")
         self._closedb()
         return
 
     def _connectdb(self, returniferror = False, cursor = False):
-	import sqlite3
+        import sqlite3
         if self.__conn is not None:
             if cursor:
                 return self.__conn.cursor()
@@ -232,8 +238,9 @@ class PackageDB:
         cur.execute("SELECT name, version FROM packages WHERE name = ?", (pkgName, ))
         rv = cur.fetchone()
         self._closedb()
-        if rv is None: return None
-        return { rv["name"] : rv["version"] }
+        if rv is None:
+            return None
+        return {rv["name"]: rv["version"]}
 
     def UpdatePackage(self, pkgName, curVers, newVers, scripts):
         cur = self.FindPackage(pkgName)
@@ -366,7 +373,7 @@ class PackageDB:
         file_list = []
         for row in rows:
             path = row[0]
-            full_path = self.__db_root + "/" +  path
+            full_path = self.__db_root + "/" + path
             if Installer.RemoveFile(full_path) == False:
                 raise Exception("Cannot remove file %s" % path)
             file_list.append((path, ))
@@ -375,7 +382,7 @@ class PackageDB:
         self._closedb()
         return True
 
-    def RemovePackageDirectories(self, pkgName, failDirectoryRemoval = False):
+    def RemovePackageDirectories(self, pkgName, failDirectoryRemoval=False):
         # Remove the directories in a package.  This removes them from
         # both the filesystem and database.  If failDirectoryRemoval is True,
         # and a directory cannot be removed, return False.  Otherwise,
@@ -394,7 +401,7 @@ class PackageDB:
         for row in rows:
             path = row[0]
             full_path = self.__db_root + "/" + path
-            if Installer.RemoveDirectory(full_path) == False and failDirectoryRemoval == True:
+            if Installer.RemoveDirectory(full_path) is False and failDirectoryRemoval is True:
                 raise Exception("Cannot remove directory %s" % path)
             dir_list.append((path, ))
         cur.executemany("DELETE FROM files WHERE path = ?", dir_list)
@@ -410,14 +417,14 @@ class PackageDB:
             )
             return False
 
-        cur = self._connectdb(cursor = True)
+        cur = self._connectdb(cursor=True)
         cur.execute("DELETE FROM scripts WHERE package = ?", (pkgName, ))
         self._closedb()
         return True
 
     # This removes the contents of the given packages from both the filesystem
     # and the database.  It leaves the package itself in the database.
-    def RemovePackageContents(self, pkgName, failDirectoryRemoval = False):
+    def RemovePackageContents(self, pkgName, failDirectoryRemoval=False):
         if self.FindPackage(pkgName) is None:
             log.warn("Package %s is not in database", pkgName)
             return False
@@ -480,22 +487,27 @@ class UpdateServer(object):
     @property
     def name(self):
         return self._name
+
     @name.setter
     def name(self, name):
         if name is None:
             raise ValueError("Cannot set UpdateServer name to nothing")
         self._name = name
+
     @property
     def url(self):
         return self._url
+
     @url.setter
     def url(self, url):
         if url is None:
             raise ValueError("Cannot set UpdateServer URL to nothing!")
         self._url = url
+
     @property
     def signature_required(self):
         return self._signature_required
+
     @signature_required.setter
     def signature_required(self, sr):
         self._signature_required = sr
@@ -526,12 +538,14 @@ class Configuration(object):
         return self._update_server.master
     def UpdateServerURL(self):
         return self._update_server.url
+
     def UpdateServerName(self):
         return self._update_server.name
+
     def UpdateServerSigned(self):
         return self._update_server.signature_required
 
-    def TryGetNetworkFile(self, file=None, url=None, handler=None, pathname = None, reason = None, intr_ok = False):
+    def TryGetNetworkFile(self, file=None, url=None, handler=None, pathname=None, reason=None, intr_ok=False):
         from . import DEFAULT_CA_FILE
 
         AVATAR_VERSION = "X-%s-Manifest-Version" % Avatar()
@@ -581,9 +595,10 @@ class Configuration(object):
             if retval is None:
                 retval = open(pathname, "w+b")
         else:
-            retval = tempfile.TemporaryFile(dir = self._temp)
-            
-        if read > 0:  log.debug("File already exists, using a starting size of %d" % read)
+            retval = tempfile.TemporaryFile(dir=self._temp)
+
+        if read > 0:
+            log.debug("File already exists, using a starting size of %d" % read)
 
         furl = None
         for url in file_url:
@@ -684,7 +699,7 @@ class Configuration(object):
                 retval.write(data)
         except Exception as e:
             log.debug("Got exception %s" % str(e))
-            if intr_ok == False and pathname:
+            if intr_ok is False and pathname:
                 os.unlink(pathname)
             raise e
         retval.seek(0)
@@ -694,7 +709,7 @@ class Configuration(object):
     # The file is a JSON file.
     # This sets self._trains as a dictionary of
     # Train objects (key being the train name).
-    def LoadTrainsConfig(self, updatecheck = False):
+    def LoadTrainsConfig(self, updatecheck=False):
         import json
         self._trains = {}
         if self._temp:
@@ -735,7 +750,8 @@ class Configuration(object):
         import json
         sys_mani = self.SystemManifest()
         current_train = sys_mani.Train()
-        if self._trains is None: self._trains = {}
+        if self._trains is None:
+            self._trains = {}
         if current_train not in self._trains:
             self._trains[current_train] = Train.Train(current_train, "Installed OS", sys_mani.Sequence())
         if self._temp:
@@ -769,7 +785,8 @@ class Configuration(object):
         return self._manifest
 
     def PackageDB(self, root = None, create = True):
-        if root is None: root = self._root
+        if root is None:
+            root = self._root
         return PackageDB(root, create)
 
     def LoadConfigurationFile(self, path):
@@ -812,9 +829,10 @@ class Configuration(object):
         self._package_dir = loc
         return
 
-    def AddSearchLocation(self, loc, insert = False):
+    def AddSearchLocation(self, loc, insert=False):
         raise Exception("Deprecated method")
-        if self._search is None:  self._search = []
+        if self._search is None:
+            self._search = []
         if insert is True:
             self._search.insert(0, loc)
         else:
@@ -857,7 +875,7 @@ class Configuration(object):
         I decide it should be called.
         """
         rv = {}
-        fileref = self.TryGetNetworkFile(file = TRAIN_FILE, reason = "FetchTrains")
+        fileref = self.TryGetNetworkFile(file=TRAIN_FILE, reason="FetchTrains")
 
         if fileref is None:
             return None
@@ -870,7 +888,7 @@ class Configuration(object):
                 continue
             # Input is <name><white_space><description>
             m = re.search("(\S+)\s+(.*)$", line)
-            if m is None or m.lastindex == None:
+            if m is None or m.lastindex is None:
                 log.debug("Input line `%s' is unparsable" % line)
                 continue
             rv[m.group(1)] = m.group(2)
@@ -882,7 +900,7 @@ class Configuration(object):
             self._trains = self.LoadTrainsConfig()
         return self._trains
 
-    def WatchTrain(self, train, watch = True):
+    def WatchTrain(self, train, watch=True):
         """
         Add a train to the local set to be watched.
         A watched train is checked for updates.
@@ -914,7 +932,7 @@ class Configuration(object):
         return
 
     def CreateTemporaryFile(self):
-        return tempfile.TemporaryFile(dir = self._temp)
+        return tempfile.TemporaryFile(dir=self._temp)
 
     def PackagePath(self, pkg):
         if self._package_dir:
@@ -930,7 +948,7 @@ class Configuration(object):
         else:
             return "%s/Packages/%s" % (self.UpdateServerURL(), pkg.FileName(old_version))
 
-    def GetManifest(self, train = None, sequence = None, handler = None):
+    def GetManifest(self, train=None, sequence=None, handler=None):
         """
         GetManifest:  fetch, over the network, the requested
         manifest file.  If train isn't specified, it'll use
@@ -1037,14 +1055,14 @@ class Configuration(object):
         # The first file is the full package.
         package_files = []
         if pkg_type is not PkgFileDeltaOnly:
-            package_files.append({ "Filename" : package.FileName(), "Checksum" : package.Checksum()})
+            package_files.append({"Filename": package.FileName(), "Checksum": package.Checksum()})
         # The next one is the delta package, if it exists.
         # For that, we look through package.Updates(), looking for one that
         # has the same version as what is currently installed.
         # So first we have to get the current version.
         if pkg_type is not PkgFileFullOnly:
             try:
-                pkgdb = self.PackageDB(create = False)
+                pkgdb = self.PackageDB(create=False)
                 if pkgdb:
                     pkgInfo = pkgdb.FindPackage(package.Name())
                     if pkgInfo:
@@ -1052,15 +1070,16 @@ class Configuration(object):
                         if curVers and curVers != package.Version():
                             upgrade = package.Update(curVers)
                             if upgrade:
-                                tdict = { "Filename" : package.FileName(curVers),
-                                          "Checksum" : None,
-                                          "Reboot"   : upgrade.RequiresReboot(),
-                                          "Delta"    : True,
-                                      }
+                                tdict = {
+                                    "Filename": package.FileName(curVers),
+                                    "Checksum": None,
+                                    "Reboot": upgrade.RequiresReboot(),
+                                    "Delta": True,
+                                }
                                 if upgrade.Checksum():
                                     tdict[Package.CHECKSUM_KEY] = upgrade.Checksum()
                                 if upgrade.Size():
-                                    tdict[Package.SIZE_KEY] = upgrade.Size()    
+                                    tdict[Package.SIZE_KEY] = upgrade.Size()
                                 package_files.append(tdict)
             except:
                 # No update packge that matches.
@@ -1104,13 +1123,12 @@ class Configuration(object):
                 save_name = save_dir + "/" + search_attempt["Filename"]
 
             file = self.TryGetNetworkFile(
-                file = pFile,
-                handler = handler,
-                pathname = save_name,
-                reason = "DownloadPackageFile",
-                intr_ok = True
-            )
-            
+                file=pFile,
+                handler=handler,
+                pathname=save_name,
+                reason="DownloadPackageFile",
+                intr_ok=True
+                )
             if file:
                 if search_attempt["Checksum"]:
                     h = ChecksumFile(file)
@@ -1120,12 +1138,14 @@ class Configuration(object):
                         # For an interrupted download of a package file,
                         # this won't be reached due to an exception.
                         log.debug("Checksum doesn't match, removing file")
-                        if save_name: os.unlink(save_name)
+                        if save_name:
+                            os.unlink(save_name)
                 else:
                     # No checksum for the file, so we just go with it
                     return file
 
         return None
+
 
 def is_ignore_path(path):
     for i in VERIFY_SKIP_PATHS:
@@ -1135,9 +1155,12 @@ def is_ignore_path(path):
     return False
 
 def get_ftype_and_perm(mode):
-    """ Returns a tuple of whether the file is: file(regular file)/dir/slink
+    """
+    Returns a tuple of whether the file is: file(regular file)/dir/slink
     /char. spec/block spec/pipe/socket and the permission bits of the file.
-    If it does not match any of the cases below (it will return "unknown" twice)"""
+    If it does not match any of the cases below (it will return "unknown" twice)
+    """
+
     if S_ISREG(mode):
         return "file", S_IMODE(mode)
     if S_ISDIR(mode):
@@ -1155,53 +1178,66 @@ def get_ftype_and_perm(mode):
     return "unknown", "unknown"
 
 def check_ftype(objs):
-    """ Checks the filetype, permissions and uid,gid of the
+    """
+    Checks the filetype, permissions and uid,gid of the
     pkgdg object(objs) sent to it. Returns two dicts: ed and pd
     (the error_dict with a descriptive explanantion of the problem
     if present, none otherwise, the perm_dict with a description of
     the incoorect perms if present, none otherwise
     """
+
     ed = None
     pd = None
     lst_var = os.lstat(objs["path"])
     ftype, perm = get_ftype_and_perm(lst_var.st_mode)
     if ftype != objs["kind"]:
-        ed = dict([('path', objs["path"]),
-                ('problem', 'Expected %s, Got %s' %(objs["kind"], ftype)),
-                ('pkgdb_entry', objs)])
+        ed = dict([
+            ('path', objs["path"]),
+            ('problem', 'Expected {0}, Got {1}'.format(objs["kind"], ftype)),
+            ('pkgdb_entry', objs)
+        ])
     pdtmp = ''
-    if perm!=objs["mode"]:
-        pdtmp+="\nExpected MODE: %s, Got: %s" %(oct(objs["mode"]), oct(perm))
-    if lst_var.st_uid!=objs["uid"]:
-        pdtmp+="\nExpected UID: %s, Got: %s" %(objs["uid"], lst_var.st_uid)
-    if lst_var.st_gid!=objs["gid"]:
-        pdtmp+="\nExpected GID: %s, Got: %s" %(objs["gid"], lst_var.st_gid)
+    if perm != objs["mode"]:
+        pdtmp += "\nExpected MODE: {0}, Got: {1}".format(oct(objs["mode"]), oct(perm))
+    if lst_var.st_uid != objs["uid"]:
+        pdtmp += "\nExpected UID: {0}, Got: {1}".format(objs["uid"], lst_var.st_uid)
+    if lst_var.st_gid != objs["gid"]:
+        pdtmp += "\nExpected GID: {0}, Got: {1}".format(objs["gid"], lst_var.st_gid)
     if pdtmp and not objs["path"].endswith(".pyc"):
-        pd = dict([('path', objs["path"]),
-                ('problem', pdtmp[1:]),
-                ('pkgdb_entry', objs)])
+        pd = dict([
+            ('path', objs["path"]),
+            ('problem', pdtmp[1:]),
+            ('pkgdb_entry', objs)
+        ])
     return ed, pd
 
 def do_verify(verify_handler=None):
-    """A function that goes through the provided pkgdb filelist and verifies it with
-    the current root filesystem."""
+    """
+    A function that goes through the provided pkgdb filelist and verifies it with
+    the current root filesystem.
+    """
+
     error_flag = False
-    error_list = dict([('checksum', []), ('wrongtype',[]), ('notfound',[])])
+    error_list = dict([
+        ('checksum', []),
+        ('wrongtype', []),
+        ('notfound', [])
+    ])
     warn_flag = False
     warn_list = []
-    i=0 # counter for progress indication in the UI
+    i = 0  # counter for progress indication in the UI
 
-    pkgdb = PackageDB(create = False)
+    pkgdb = PackageDB(create=False)
     if pkgdb is None:
         raise IOError("Cannot get pkgdb connection")
     filelist = pkgdb.FindFilesForPackage()
-    total_files  = len(filelist)
+    total_files = len(filelist)
 
     for objs in filelist:
         i = i+1
         if verify_handler is not None:
-            verify_handler(i,total_files,objs["path"])
-        tmp = '' # Just a temp. variable to store the text to be hashed
+            verify_handler(i, total_files, objs["path"])
+        tmp = b''  # Just a temp. variable to store the text to be hashed
         if is_ignore_path(objs["path"]):
             continue
         if not os.path.lexists(objs["path"]):
@@ -1211,9 +1247,11 @@ def do_verify(verify_handler=None):
             # and will be caught in one of the if conds below.
             # For more information: https://docs.python.org/2/library/os.path.html
             error_flag = True
-            error_list['notfound'].append(dict([('path', objs["path"]),
+            error_list['notfound'].append(dict([
+                ('path', objs["path"]),
                 ('problem', 'path does not exsist'),
-                ('pkgdb_entry', objs)]))
+                ('pkgdb_entry', objs)
+            ]))
             continue
 
         ed, pd = check_ftype(objs)
@@ -1225,24 +1263,26 @@ def do_verify(verify_handler=None):
             warn_list.append(pd)
 
         if objs["kind"] == "slink":
-            tmp = os.readlink(objs["path"])
-            if tmp.startswith('/'):
+            tmp = os.readlink(objs["path"]).encode('utf8')
+            if tmp.startswith(b'/'):
                 tmp = tmp[1:]
 
         if objs["kind"] == "file":
             if objs["path"].endswith(".pyc"):
                 continue
-            tmp = open(objs["path"]).read()
-
+            with open(objs["path"], 'rb') as f:
+                tmp = f.read()
         # Do this last (as it needs to be done for all, but dirs, as dirs have no checksum d'oh!)
         if (
             objs["kind"] != 'dir' and
             objs["checksum"] and
-            objs["checksum"] !="-" and
-            hashlib.sha256(tmp).hexdigest()!=objs["checksum"]
-        ):
+            objs["checksum"] != "-" and
+            hashlib.sha256(tmp).hexdigest() != objs["checksum"]
+           ):
             error_flag = True
-            error_list['checksum'].append(dict([('path', objs["path"]),
+            error_list['checksum'].append(dict([
+                ('path', objs["path"]),
                 ('problem', 'checksum does not match'),
-                ('pkgdb_entry', objs)]))
+                ('pkgdb_entry', objs)
+            ]))
     return error_flag, error_list, warn_flag, warn_list
