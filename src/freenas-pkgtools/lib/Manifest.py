@@ -23,19 +23,19 @@ SYSTEM_MANIFEST_FILE = "/data/manifest"
 # SIGNATURE_KEY:  A string for the signed value of the manifest.
 # NOTES_KEY:  An array of name, URL pairs.  Typical names are "README" and "Release Notes".
 # TRAIN_KEY:  A string identifying the train for this maifest.
-# VERSION_KEY:  A string, the friendly name for this particular release.  Does not need to be unqiue.
+# VERSION_KEY: A string, the friendly name for this particular release. Does not need to be unqiue.
 # TIMESTAMP_KEY:	An integer, being the unix time of the build.
 # SCHEME_KEY:  A string, identifying the layout version.  Only one value for now.
 # NOTICE_KEY:  A string, identifying a message to be displayed before installing this manifest.
 # 	This is mainly intended to be used to indicate a particular train is ended.
-#	A notice is something more important than a release note, and is included in
-#	the manifest, rather than relying on a URL.
+# A notice is something more important than a release note, and is included in
+# the manifest, rather than relying on a URL.
 # SWITCH_KEY:  A string, identifying the train that should be used instead.
-# 	This will cause Configuraiton.FindLatestManifest() to use that value instead, so
-#	it should only be used when a particular train is end-of-life'd.
+# This will cause Configuraiton.FindLatestManifest() to use that value instead, so
+# it should only be used when a particular train is end-of-life'd.
 # REBOOT_KEY:  A boolean, indicaating whether a reboot should be done or not.
-#	This should RARELY be used, as it will over-ride the Package settings,
-#	which are a better way to determine rebootability.
+# This should RARELY be used, as it will over-ride the Package settings,
+# which are a better way to determine rebootability.
 # VALIDATE_UPDATE_KEY: A dictionary, specifying a validation program to run for updates.
 # VALIDATE_INSTALL_EKY:  A dictionary, specifying a validation program to run for installs.
 
@@ -60,12 +60,15 @@ VALIDATE_INSTALL_KEY = "InstallCheckProrgam"
 
 SCHEME_V1 = "version1"
 
+
 class ChecksumFailException(Exception):
     pass
 
+
 def MakeString(obj):
-    retval = json.dumps(obj, sort_keys=True, indent=4, separators=(',', ': '), cls = ManifestEncoder)
+    retval = json.dumps(obj, sort_keys=True, indent=4, separators=(',', ': '), cls=ManifestEncoder)
     return retval
+
 
 def DiffManifests(m1, m2):
     """
@@ -100,7 +103,7 @@ def DiffManifests(m1, m2):
 
         for P in old_list.itervalues():
             retval.insert(0, (P, "delete", None))
-    
+
         return retval
 
     # First thing, let's compare the packages
@@ -129,7 +132,7 @@ def DiffManifests(m1, m2):
                     if pkg.RequiresReboot() == True:
                         reboot_required = True
         return_diffs["Reboot"] = reboot_required
-        
+
     # Next, let's look at the train
     # XXX If NewTrain is set, should we use that?
     if m1.Train() != m2.Train():
@@ -138,8 +141,9 @@ def DiffManifests(m1, m2):
     # Sequence
     if m1.Sequence() != m2.Sequence():
         return_diffs["Sequence"] = (m1.Sequence(), m2.Sequence())
-        
+
     return return_diffs
+
 
 def CompareManifests(m1, m2):
     """
@@ -156,8 +160,10 @@ def CompareManifests(m1, m2):
     if "Packages" in diffs:
         return diffs["Packages"]
     return []
-                    
+
+
 class ManifestEncoder(json.JSONEncoder):
+
     def default(self, obj):
         if isinstance(obj, Package.Package):
             return obj.dict()
@@ -165,6 +171,7 @@ class ManifestEncoder(json.JSONEncoder):
             return obj.dict()
         else:
             return json.JSONEncoder.default(self, obj)
+
 
 class Manifest(object):
     _config = None
@@ -181,7 +188,7 @@ class Manifest(object):
     _timestamp = None
     _requireSignature = False
 
-    def __init__(self, configuration = None, require_signature = False):
+    def __init__(self, configuration=None, require_signature=False):
         if configuration is None:
             self._config = Configuration.Configuration()
         else:
@@ -304,7 +311,7 @@ class Manifest(object):
             location = location[len(location):]
         self._dict[NOTES_KEY][name] = location
 
-    def Notes(self, raw = False):
+    def Notes(self, raw=False):
         if NOTES_KEY in self._dict:
             rv = {}
             for name in self._dict[NOTES_KEY].keys():
@@ -417,7 +424,8 @@ class Manifest(object):
             log.debug("Verify command = %s" % verify_cmd)
 
             temp = self.dict().copy()
-            if SIGNATURE_KEY in temp:  temp.pop(SIGNATURE_KEY)
+            if SIGNATURE_KEY in temp:
+                temp.pop(SIGNATURE_KEY)
             canonical = MakeString(temp)
             if len(canonical) < 10 * 1024:
                 # I think we can have 10k arguments in freebsd
@@ -426,7 +434,7 @@ class Manifest(object):
                 tdata = tempfile.NamedTemporaryFile()
                 tdata.write(canonical)
                 verify_cmd.extend(["-D", tdata.name])
-            
+
             rv = False
             try:
                 subprocess.check_call(verify_cmd)
@@ -469,7 +477,8 @@ class Manifest(object):
 
             # Generate a canonical representation of the manifest
             temp = self.dict()
-            if SIGNATURE_KEY in temp: temp.pop(SIGNATURE_KEY)
+            if SIGNATURE_KEY in temp:
+                temp.pop(SIGNATURE_KEY)
             tstr = MakeString(temp)
 
             # Sign it.

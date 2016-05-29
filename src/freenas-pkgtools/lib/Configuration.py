@@ -11,11 +11,11 @@ import socket
 import ssl
 
 from . import Avatar, UPDATE_SERVER, MASTER_UPDATE_SERVER
-import Exceptions
-import Installer
-import Train
-import Package
-import Manifest
+from . import Exceptions
+from . import Installer
+from . import Train
+from . import Package
+from . import Manifest
 
 from stat import (
     S_ISDIR, S_ISCHR, S_ISBLK, S_ISREG, S_ISFIFO, S_ISLNK, S_ISSOCK,
@@ -178,7 +178,7 @@ class PackageDB:
         self.__db_path = self.__db_root + "/" + PackageDB.DB_NAME
         if os.path.exists(os.path.dirname(self.__db_path)) == False:
             if create is False:
-                raise Exception("Cannot connect to database file %s" % self.__db_path)
+                raise Exception("Cannot connect to database file {0}".format(self.__db_path))
             log.debug("Need to create %s", os.path.dirname(self.__db_path))
             os.makedirs(os.path.dirname(self.__db_path))
 
@@ -186,7 +186,9 @@ class PackageDB:
             raise Exception("Cannot connect to database file {0}".format(self.__db_path))
 
         cur = self.__conn.cursor()
-        cur.execute("CREATE TABLE IF NOT EXISTS packages(name text primary key, version text not null)")
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS packages(name text primary key, version text not null)"
+        )
         cur.execute("CREATE TABLE IF NOT EXISTS scripts(package text not null, type text not null, script text not null)")
         cur.execute("""CREATE TABLE IF NOT EXISTS
         files(package text not null,
@@ -200,7 +202,7 @@ class PackageDB:
         self._closedb()
         return
 
-    def _connectdb(self, returniferror = False, cursor = False):
+    def _connectdb(self, returniferror=False, cursor=False):
         import sqlite3
         if self.__conn is not None:
             if cursor:
@@ -215,7 +217,8 @@ class PackageDB:
                 self.__db_path,
                 str(err),
             )
-            if returniferror: return None
+            if returniferror:
+                return None
             raise err
 
         conn.text_factory = str
@@ -245,9 +248,13 @@ class PackageDB:
     def UpdatePackage(self, pkgName, curVers, newVers, scripts):
         cur = self.FindPackage(pkgName)
         if cur is None:
-            raise Exception("Package %s is not in system database, cannot update" % pkgName)
+            raise Exception("Package {0} is not in system database, cannot update".format(pkgName))
         if cur[pkgName] != curVers:
-            raise Exception("Package %s is at version %s, not version %s as requested by update" % (cur[pkgName], curVers))
+            raise Exception(
+                "Package {0} is at version {1}, not version {2} as requested by update".format(
+                    pkgName, cur[pkgName], curVers
+                )
+            )
 
         if cur[pkgName] == newVers:
             log.warn(
@@ -280,9 +287,8 @@ class PackageDB:
                             (pkgName, scriptType, scripts[scriptType]))
         self._closedb()
 
-
-    def FindScriptForPackage(self, pkgName, scriptType = None):
-        cur = self._connectdb(cursor = True)
+    def FindScriptForPackage(self, pkgName, scriptType=None):
+        cur = self._connectdb(cursor=True)
         if scriptType is None:
             cur.execute("SELECT type, script FROM scripts WHERE package = ?", (pkgName, ))
         else:
@@ -297,7 +303,7 @@ class PackageDB:
 
         return rv
 
-    def FindFilesForPackage(self, pkgName = None):
+    def FindFilesForPackage(self, pkgName=None):
         self._connectdb()
         cur = self.__conn.cursor()
         if pkgName is None:
@@ -335,7 +341,7 @@ class PackageDB:
         cur.executemany(stmt, list)
         self._closedb()
 
-    def AddFile(self, pkgName, path, type, checksum = "", uid = 0, gid = 0, flags = 0, mode = 0):
+    def AddFile(self, pkgName, path, type, checksum="", uid=0, gid=0, flags=0, mode=0):
         update = False
         if self.FindFile(path) is not None:
             update = True
@@ -463,6 +469,7 @@ class PackageDB:
         cur.execute("DELETE FROM packages WHERE name = ?", (pkgName, ))
         self._closedb()
         return
+
 
 class UpdateServer(object):
     def __init__(self, name = None, url = None, master = None, signing = True):
@@ -784,7 +791,7 @@ class Configuration(object):
                 self._manifest = None
         return self._manifest
 
-    def PackageDB(self, root = None, create = True):
+    def PackageDB(self, root=None, create=True):
         if root is None:
             root = self._root
         return PackageDB(root, create)
@@ -1035,7 +1042,6 @@ class Configuration(object):
             return None
     
     def FindPackageFile(self, package, upgrade_from=None, handler=None, save_dir = None, pkg_type = None):
-        from Update import PkgFileDeltaOnly, PkgFileFullOnly
         # Given a package, and optionally a version to upgrade from, find
         # the package file for it.  Returns a file-like
         # object for the package file.
@@ -1053,6 +1059,9 @@ class Configuration(object):
         # We have at least one, and at most two, files
         # to look for.
         # The first file is the full package.
+
+        # Leave this local import here as otherwise it causes circular import issues
+        from .Update import PkgFileDeltaOnly, PkgFileFullOnly
         package_files = []
         if pkg_type is not PkgFileDeltaOnly:
             package_files.append({"Filename": package.FileName(), "Checksum": package.Checksum()})
@@ -1101,7 +1110,7 @@ class Configuration(object):
             log.debug("Searching for %s" % search_attempt["Filename"])
             try:
                 if self._package_dir:
-                    p = "%s/%s" % (self._package_dir, search_attempt["Filename"])
+                    p = "{0}/{1}".format(self._package_dir, search_attempt["Filename"])
                     if os.path.exists(p):
                         file = open(p)
                         log.debug("Found package file %s" % p)
