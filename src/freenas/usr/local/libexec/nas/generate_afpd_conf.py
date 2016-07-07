@@ -2,8 +2,6 @@
 from middlewared.client import Client
 from middlewared.client.utils import Struct
 
-import os
-import sys
 
 def main():
     """Use the django ORM to generate a config file.  We'll build the
