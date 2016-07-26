@@ -427,12 +427,13 @@ def idmap_backend_rfc2307(client):
     except:
         return False
 
-    return (client.call('notifier.ds_idmap_type_code_to_string', ad.ad_idmap_backend) == 'IDMAP_TYPE_RFC2307')
+    return ad.ad_idmap_backend == 'rfc2307'
 
 
 def set_idmap_rfc2307_secret(client):
     try:
         ad = Struct(client.call('datastore.query', 'directoryservice.ActiveDirectory', None, {'get': True}))
+        ad.ds_type = 1  # FIXME: DS_TYPE_ACTIVEDIRECTORY = 1
     except:
         return False
 
@@ -548,6 +549,7 @@ def add_nt4_conf(client, smb4_conf):
 
     try:
         nt4 = Struct(client.call('datastore.query', 'directoryservice.nt4', None, {'get': True}))
+        nt4.ds_type = 4  # FIXME: DS_TYPE_NT4 = 4
     except:
         return
 
@@ -614,6 +616,7 @@ def set_ldap_password(client):
 def add_ldap_conf(client, smb4_conf):
     try:
         ldap = Struct(client.call('datastore.query', 'directoryservice.LDAP', None, {'get': True}))
+        ldap.ds_type = 2  # FIXME: DS_TYPE_LDAP = 2
         cifs = Struct(client.call('datastore.query', 'services.CIFS', None, {'get': True}))
     except:
         return
@@ -656,6 +659,7 @@ def add_ldap_conf(client, smb4_conf):
 def add_activedirectory_conf(client, smb4_conf):
     try:
         ad = Struct(client.call('datastore.query', 'directoryservice.ActiveDirectory', None, {'get': True}))
+        ad.ds_type = 1  # FIXME: DS_TYPE_ACTIVEDIRECTORY = 1
     except:
         return
 
